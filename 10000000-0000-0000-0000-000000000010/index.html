@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery List Generator</title>
+<style>
+  :root {
+    --green: #2d6a4f;
+    --green-light: #52b788;
+    --green-pale: #d8f3dc;
+    --orange: #f4845f;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --muted: #6c757d;
+    --border: #e9ecef;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header { background: var(--green); color: white; padding: 20px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header span { font-size: 1.8rem; }
+
+  .container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: var(--green); display: flex; align-items: center; gap: 8px; }
+
+  .api-key-row { display: flex; gap: 8px; }
+  .api-key-row input { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: monospace; }
+  .api-key-row input:focus { outline: none; border-color: var(--green-light); }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+  .tab { padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 0.85rem; cursor: pointer; transition: all .15s; }
+  .tab.active { background: var(--green); color: white; border-color: var(--green); }
+
+  textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; resize: vertical; min-height: 120px; font-family: inherit; }
+  textarea:focus { outline: none; border-color: var(--green-light); }
+  input[type=url] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; }
+  input[type=url]:focus { outline: none; border-color: var(--green-light); }
+
+  .recipe-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+  .recipe-item { display: flex; align-items: center; gap: 8px; background: var(--green-pale); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 0.9rem; }
+  .recipe-item button { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1rem; }
+
+  .btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .btn-primary { background: var(--green); color: white; }
+  .btn-primary:hover { background: #1b4332; }
+  .btn-primary:disabled { background: var(--muted); cursor: not-allowed; }
+  .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--green-light); }
+  .btn-sm { padding: 6px 14px; font-size: 0.82rem; }
+  .btn-orange { background: var(--orange); color: white; }
+
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+
+  .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.9rem; padding: 16px 0; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 12px 16px; border-radius: 8px; font-size: 0.9rem; margin-top: 12px; }
+
+  /* Grocery List Output */
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .list-actions { display: flex; gap: 8px; }
+
+  .category-section { margin-bottom: 20px; }
+  .category-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .ingredient-row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 4px; border-radius: 6px; transition: background .1s; }
+  .ingredient-row:hover { background: var(--bg); }
+  .ingredient-row input[type=checkbox] { margin-top: 2px; accent-color: var(--green); width: 16px; height: 16px; flex-shrink: 0; }
+  .ingredient-row label { font-size: 0.92rem; cursor: pointer; line-height: 1.4; }
+  .ingredient-row.checked label { text-decoration: line-through; color: var(--muted); }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.95rem; }
+
+  .badge { display: inline-block; background: var(--green-pale); color: var(--green); font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; margin-left: 8px; }
+
+  @media (max-width: 600px) { .row { flex-direction: column; align-items: stretch; } .btn { text-align: center; } }
+</style>
+</head>
+<body>
+
+<header>
+  <span>🛒</span>
+  <div>
+    <h1>Grocery List Generator</h1>
+    <div style="font-size:.8rem;opacity:.8">Paste recipes → get a clean, categorized shopping list</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- API Key -->
+  <div class="card" id="apiKeyCard">
+    <h2>🔑 Anthropic API Key</h2>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px">Used to parse recipes with AI. Stored in your browser only, never sent anywhere else.</p>
+    <div class="api-key-row">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+      <button class="btn btn-primary" onclick="saveKey()">Save</button>
+      <button class="btn btn-outline" onclick="clearKey()" title="Clear key">✕</button>
+    </div>
+    <div id="keyStatus" style="font-size:.82rem;margin-top:8px;color:var(--muted)"></div>
+  </div>
+
+  <!-- Recipe Input -->
+  <div class="card">
+    <h2>📋 Add Recipes</h2>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('text', this)">Paste Text</button>
+      <button class="tab" onclick="switchTab('url', this)">From URL</button>
+    </div>
+
+    <div id="tabText">
+      <div class="recipe-label">Paste recipe text (ingredients section or full recipe)</div>
+      <textarea id="recipeText" placeholder="Example:&#10;- 2 cups all-purpose flour&#10;- 1 tsp baking soda&#10;- 3 ripe bananas&#10;- 1/2 cup butter&#10;..."></textarea>
+    </div>
+    <div id="tabUrl" style="display:none">
+      <div class="recipe-label">Enter a recipe URL</div>
+      <input type="url" id="recipeUrl" placeholder="https://..." />
+      <div style="font-size:.78rem;color:var(--muted);margin-top:6px">We'll fetch and extract the ingredients automatically</div>
+    </div>
+
+    <div class="row">
+      <button class="btn btn-outline btn-sm" onclick="addRecipe()">+ Add to Queue</button>
+      <button class="btn btn-primary" id="generateBtn" onclick="generate()">✨ Generate List</button>
+    </div>
+
+    <!-- Recipe queue -->
+    <div id="recipeQueue" style="margin-top:14px"></div>
+  </div>
+
+  <!-- Output -->
+  <div class="card" id="outputCard">
+    <div class="list-header">
+      <h2 style="margin-bottom:0">🥦 Shopping List <span id="itemCount" class="badge" style="display:none"></span></h2>
+      <div class="list-actions">
+        <button class="btn btn-outline btn-sm" onclick="copyList()">📋 Copy</button>
+        <button class="btn btn-outline btn-sm" onclick="clearList()">🗑 Clear</button>
+      </div>
+    </div>
+
+    <div id="listOutput">
+      <div class="empty-state">
+        <div class="icon">🥕</div>
+        <p>Your grocery list will appear here.<br>Add a recipe above and hit Generate.</p>
+      </div>
+    </div>
+
+    <div id="loadingState" style="display:none" class="loading">
+      <div class="spinner"></div>
+      <span id="loadingText">Parsing recipes with AI...</span>
+    </div>
+
+    <div id="errorState" style="display:none" class="error"></div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let apiKey = localStorage.getItem('grocery_api_key') || '';
+let recipes = JSON.parse(localStorage.getItem('grocery_recipes') || '[]');
+let groceryList = JSON.parse(localStorage.getItem('grocery_list') || 'null');
+let activeTab = 'text';
+
+const CATEGORY_ORDER = ['Produce','Meat & Seafood','Dairy & Eggs','Bread & Bakery','Pantry','Frozen','Beverages','Snacks & Sweets','Other'];
+const CATEGORY_ICONS = {'Produce':'🥦','Meat & Seafood':'🥩','Dairy & Eggs':'🥛','Bread & Bakery':'🍞','Pantry':'🫙','Frozen':'🧊','Beverages':'🥤','Snacks & Sweets':'🍫','Other':'📦'};
+
+// ── Init ───────────────────────────────────────────────────────────────────
+window.onload = () => {
+  if (apiKey) {
+    document.getElementById('apiKeyInput').value = '••••••••••••••••';
+    document.getElementById('keyStatus').textContent = '✓ API key saved';
+    document.getElementById('keyStatus').style.color = 'var(--green)';
+  }
+  renderQueue();
+  if (groceryList) renderList(groceryList);
+};
+
+// ── API Key ────────────────────────────────────────────────────────────────
+function saveKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val || val.startsWith('•')) return;
+  apiKey = val;
+  localStorage.setItem('grocery_api_key', val);
+  document.getElementById('apiKeyInput').value = '••••••••••••••••';
+  document.getElementById('keyStatus').textContent = '✓ Saved!';
+  document.getElementById('keyStatus').style.color = 'var(--green)';
+}
+
+function clearKey() {
+  apiKey = '';
+  localStorage.removeItem('grocery_api_key');
+  document.getElementById('apiKeyInput').value = '';
+  document.getElementById('keyStatus').textContent = 'Key cleared.';
+  document.getElementById('keyStatus').style.color = 'var(--muted)';
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tabText').style.display = tab === 'text' ? '' : 'none';
+  document.getElementById('tabUrl').style.display = tab === 'url' ? '' : 'none';
+}
+
+// ── Recipe Queue ───────────────────────────────────────────────────────────
+function addRecipe() {
+  const text = activeTab === 'text'
+    ? document.getElementById('recipeText').value.trim()
+    : document.getElementById('recipeUrl').value.trim();
+  if (!text) return;
+  const label = activeTab === 'url' ? text : text.slice(0, 60) + (text.length > 60 ? '…' : '');
+  recipes.push({ type: activeTab, content: text, label });
+  localStorage.setItem('grocery_recipes', JSON.stringify(recipes));
+  document.getElementById('recipeText').value = '';
+  document.getElementById('recipeUrl').value = '';
+  renderQueue();
+}
+
+function removeRecipe(i) {
+  recipes.splice(i, 1);
+  localStorage.setItem('grocery_recipes', JSON.stringify(recipes));
+  renderQueue();
+}
+
+function renderQueue() {
+  const el = document.getElementById('recipeQueue');
+  if (!recipes.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="recipe-label">${recipes.length} recipe(s) queued:</div>` +
+    recipes.map((r, i) => `
+      <div class="recipe-item">
+        <span>${r.type === 'url' ? '🔗' : '📄'}</span>
+        <span style="flex:1;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(r.label)}</span>
+        <button onclick="removeRecipe(${i})" title="Remove">✕</button>
+      </div>`).join('');
+}
+
+// ── Generate ───────────────────────────────────────────────────────────────
+async function generate() {
+  if (!apiKey) { showError('Please enter your Anthropic API key first.'); return; }
+
+  // collect inputs
+  const queuedRecipes = [...recipes];
+  const currentText = document.getElementById('recipeText').value.trim();
+  const currentUrl = document.getElementById('recipeUrl').value.trim();
+  if (activeTab === 'text' && currentText) queuedRecipes.push({ type: 'text', content: currentText });
+  if (activeTab === 'url' && currentUrl) queuedRecipes.push({ type: 'url', content: currentUrl });
+
+  if (!queuedRecipes.length) { showError('Add at least one recipe first.'); return; }
+
+  setLoading(true, 'Fetching recipe content...');
+  clearError();
+
+  try {
+    // Resolve URLs to text
+    const resolvedRecipes = [];
+    for (const r of queuedRecipes) {
+      if (r.type === 'url') {
+        setLoading(true, `Fetching ${r.content}...`);
+        try {
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(r.content)}`;
+          const res = await fetch(proxyUrl);
+          const html = await res.text();
+          // strip tags for cleaner input
+          const text = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0, 8000);
+          resolvedRecipes.push({ label: r.content, text });
+        } catch (e) {
+          resolvedRecipes.push({ label: r.content, text: r.content });
+        }
+      } else {
+        resolvedRecipes.push({ label: r.label || 'Recipe', text: r.content });
+      }
+    }
+
+    setLoading(true, 'Parsing ingredients with AI...');
+
+    const recipeBlock = resolvedRecipes.map((r, i) =>
+      `### Recipe ${i+1}: ${r.label}\n${r.text}`
+    ).join('\n\n');
+
+    const prompt = `You are a culinary assistant. Extract ALL ingredients from the following recipe(s), normalize quantities (combine duplicates, convert units where sensible), and return a JSON shopping list.
+
+Rules:
+- Combine duplicate ingredients across recipes (e.g., "1 cup flour" + "2 cups flour" = "3 cups flour")
+- Normalize units (e.g., "16 oz" → "1 lb" for meat, keep cups/tbsp for baking)
+- Categorize each ingredient into one of: Produce, Meat & Seafood, Dairy & Eggs, Bread & Bakery, Pantry, Frozen, Beverages, Snacks & Sweets, Other
+- Format quantities cleanly (e.g., "2 cups", "1 lb", "3 cloves")
+- Ignore non-ingredient text (instructions, notes, serving sizes)
+
+Return ONLY valid JSON in this exact format:
+{
+  "categories": {
+    "Produce": [
+      {"name": "garlic", "quantity": "4 cloves"},
+      {"name": "lemon", "quantity": "2"}
+    ],
+    "Pantry": [
+      {"name": "all-purpose flour", "quantity": "3 cups"}
+    ]
+  }
+}
+
+Recipes:
+${recipeBlock}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+
+    const data = await response.json();
+    const raw = data.content[0].text;
+
+    // extract JSON from response
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Could not parse AI response');
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    groceryList = parsed;
+    localStorage.setItem('grocery_list', JSON.stringify(parsed));
+
+    setLoading(false);
+    renderList(parsed);
+
+  } catch (e) {
+    setLoading(false);
+    showError(e.message);
+  }
+}
+
+// ── Render List ────────────────────────────────────────────────────────────
+function renderList(data) {
+  const categories = data.categories || {};
+  const orderedKeys = [
+    ...CATEGORY_ORDER.filter(k => categories[k]?.length),
+    ...Object.keys(categories).filter(k => !CATEGORY_ORDER.includes(k) && categories[k]?.length)
+  ];
+
+  if (!orderedKeys.length) {
+    document.getElementById('listOutput').innerHTML = '<div class="empty-state"><div class="icon">🤔</div><p>No ingredients found. Try a different recipe.</p></div>';
+    return;
+  }
+
+  let total = 0;
+  const html = orderedKeys.map(cat => {
+    const items = categories[cat];
+    total += items.length;
+    return `<div class="category-section">
+      <div class="category-title">${CATEGORY_ICONS[cat] || '📦'} ${cat}</div>
+      ${items.map((item, i) => {
+        const id = `item_${cat}_${i}`;
+        const checked = (JSON.parse(localStorage.getItem('grocery_checked') || '{}')?.[id]) || false;
+        return `<div class="ingredient-row ${checked ? 'checked' : ''}" id="row_${id}">
+          <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} onchange="toggleCheck('${id}')">
+          <label for="${id}"><strong>${escHtml(item.quantity)}</strong> ${escHtml(item.name)}</label>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  document.getElementById('listOutput').innerHTML = html;
+  document.getElementById('itemCount').textContent = `${total} items`;
+  document.getElementById('itemCount').style.display = '';
+}
+
+function toggleCheck(id) {
+  const checked = JSON.parse(localStorage.getItem('grocery_checked') || '{}');
+  checked[id] = document.getElementById(id).checked;
+  localStorage.setItem('grocery_checked', JSON.stringify(checked));
+  document.getElementById('row_' + id)?.classList.toggle('checked', checked[id]);
+}
+
+function copyList() {
+  if (!groceryList) return;
+  const cats = groceryList.categories || {};
+  const lines = [];
+  for (const cat of CATEGORY_ORDER) {
+    if (!cats[cat]?.length) continue;
+    lines.push(`\n${cat.toUpperCase()}`);
+    cats[cat].forEach(i => lines.push(`  • ${i.quantity} ${i.name}`));
+  }
+  navigator.clipboard.writeText(lines.join('\n').trim()).then(() => {
+    const btn = event.target;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy', 2000);
+  });
+}
+
+function clearList() {
+  groceryList = null;
+  localStorage.removeItem('grocery_list');
+  localStorage.removeItem('grocery_checked');
+  document.getElementById('listOutput').innerHTML = '<div class="empty-state"><div class="icon">🥕</div><p>Your grocery list will appear here.<br>Add a recipe above and hit Generate.</p></div>';
+  document.getElementById('itemCount').style.display = 'none';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function setLoading(show, text) {
+  document.getElementById('loadingState').style.display = show ? 'flex' : 'none';
+  document.getElementById('loadingText').textContent = text || '';
+  document.getElementById('generateBtn').disabled = show;
+  if (show) document.getElementById('listOutput').style.opacity = '0.4';
+  else document.getElementById('listOutput').style.opacity = '1';
+}
+
+function showError(msg) { const e = document.getElementById('errorState'); e.textContent = '⚠ ' + msg; e.style.display = ''; }
+function clearError() { document.getElementById('errorState').style.display = 'none'; }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
